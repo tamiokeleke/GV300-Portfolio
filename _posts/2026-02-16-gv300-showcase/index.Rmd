@@ -1,0 +1,166 @@
+---
+title: "GV300 Showcase: A/B Testing and Average Treatment Effects"
+description: "A short walkthrough of a simulated political A/B test, estimating the ATE with difference-in-means, OLS, and logistic regression."
+date: 2026-02-16
+output:
+  distill::distill_article:
+    toc: true
+    toc_depth: 3
+    code_folding: true
+categories: [gv300, causal-inference, experiments]
+---
+```{r, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+set.seed(2024)
+library(ggplot2)
+```
+# Overview
+
+This page showcases a simulated A/B test in a political communications setting. A fictitious political party tests two homepage versions to increase the probability that visitors sign up as supporters. I simulate data for 1,500 visitors, visualise signup rates by condition, and estimate the Average Treatment Effect (ATE) using difference-in-means, a linear probability model, and logistic regression. I also discuss why model interpretation differs across OLS vs logit, and briefly reflect on ethical considerations when experimentation is applied to political messaging.
+
+# Simulating the A/B test data
+
+We simulate data where the baseline signup probability under the control homepage is 0.12, and the issue-focused homepage increases signup probability to 0.17.
+
+```{r}
+# 1. Set sample size
+n <- 1500
+
+# 2. Random treatment assignment (50/50 split)
+treatment <- rbinom(n = n, size = 1, prob = 0.5)
+
+# 3. Potential outcome probabilities
+p_control <- 0.12
+p_treated <- 0.17
+
+Y0 <- rbinom(n = n, size = 1, prob = p_control)  # outcome under control
+Y1 <- rbinom(n = n, size = 1, prob = p_treated)  # outcome under treatment
+
+# 4. Realised outcome
+support_signup <- ifelse(treatment == 1, Y1, Y0)
+
+# 5. Data frame
+party_ab <- data.frame(
+  visitor_id     = 1:n,
+  treatment      = treatment,
+  support_signup = support_signup
+)
+
+head(party_ab)
+summary(party_ab)
+table(party_ab$treatment)
+table(party_ab$support_signup)
+```
+
+Concepts (briefly): treatment is random assignment to Version B (issue-focused) vs Version A (control). Y0 and Y1 represent potential outcomes under control vs treatment, but we only observe one for each person (the other is the counterfactual), which is why causal inference is hard outside randomized designs.
+
+# Signup rates and the difference-in-means ATE
+
+```{r}
+mean_control <- mean(party_ab$support_signup[party_ab$treatment == 0])
+mean_treated <- mean(party_ab$support_signup[party_ab$treatment == 1])
+
+ate_hat <- mean_treated - mean_control
+
+mean_control
+mean_treated
+ate_hat
+```
+
+```{r}
+means_df <- data.frame(
+  condition = c("Control homepage", "Issue-focused homepage"),
+  mean_signup = c(mean_control, mean_treated)
+)
+
+ggplot(means_df, aes(x = condition, y = mean_signup)) +
+  geom_col(width = 0.6) +
+  geom_text(aes(label = paste0(round(mean_signup * 100, 1), "%")), vjust = -0.5) +
+  scale_y_continuous(limits = c(0, 0.25), expand = expansion(mult = c(0, 0.05))) +
+  labs(
+    x = NULL,
+    y = "Signup rate",
+    title = "Supporter signup rate by homepage version",
+    subtitle = paste0("Estimated ATE (diff-in-means): ", round(ate_hat * 100, 2), " percentage points")
+  ) +
+  theme_minimal()
+```
+
+Interpretation: The control group’s mean is the signup rate under the standard homepage, and the treated group’s mean is the signup rate under the issue-focused homepage. The estimated ATE (ate_hat) is the difference in these rates, interpretable as a percentage-point change in signups attributable to the treatment in this experiment.
+
+# Linear probability model (OLS)
+
+```{r}
+lm_model <- lm(support_signup ~ treatment, data = party_ab)
+summary(lm_model)
+coef(lm_model)
+```
+
+In this simple randomized A/B test, the coefficient on treatment equals the difference in means (the ATE estimate), and the intercept equals the control-group mean.
+
+# Logistic regression (logit) and predicted probabilities
+```{r}
+logit_model <- glm(
+  support_signup ~ treatment,
+  data = party_ab,
+  family = binomial(link = "logit")
+)
+summary(logit_model)
+```
+
+Logit coefficients are in log-odds, so I transform predictions into probabilities to interpret the effect in the same units as the ATE.
+
+```{r}
+p_hat_control <- predict(logit_model, newdata = data.frame(treatment = 0), type = "response")
+p_hat_treated <- predict(logit_model, newdata = data.frame(treatment = 1), type = "response")
+ate_logit <- p_hat_treated - p_hat_control
+
+p_hat_control
+p_hat_treated
+ate_logit
+```
+
+# Comparing OLS vs logit visually
+```{r}
+group_df <- data.frame(
+  treatment = c(0, 1),
+  prob = c(mean_control, mean_treated),
+  model = "OLS group means"
+)
+
+logit_df <- data.frame(
+  treatment = c(0, 1),
+  prob = c(p_hat_control, p_hat_treated),
+  model = "Logit predicted probs"
+)
+
+ggplot() +
+  geom_point(data = party_ab,
+             aes(x = factor(treatment), y = support_signup),
+             position = position_jitter(width = 0.1, height = 0),
+             alpha = 0.08) +
+  geom_line(data = group_df,
+            aes(x = factor(treatment), y = prob, group = 1),
+            linewidth = 1) +
+  geom_point(data = group_df,
+             aes(x = factor(treatment), y = prob),
+             size = 3) +
+  geom_point(data = logit_df,
+             aes(x = factor(treatment), y = prob),
+             shape = 17,
+             size = 3) +
+  scale_x_discrete(labels = c("Control", "Treatment")) +
+  labs(
+    x = "Condition",
+    y = "Signup (0/1) with fitted probabilities",
+    title = "Observed outcomes and fitted probabilities",
+    subtitle = "Circles = OLS group means; triangles = logit predicted probabilities"
+  ) +
+  theme_minimal()
+```
+
+Summary: Both models tell the same story here because the design is randomized and the model is simple (one binary treatment). OLS is easier to interpret directly in probability (percentage points), while logit is often preferred for binary outcomes but requires transforming log-odds into probabilities to interpret effects.
+
+# Ethical reflection
+
+Political A/B testing raises ethical issues beyond typical product optimization because experiments can influence beliefs, not just clicks. Even small average effects can matter at scale, shaping who becomes a supporter and which messages spread. Consent and transparency are key concerns, since visitors typically do not know they are being experimented on. Targeting and heterogeneity can create incentives to optimise persuasion for susceptible groups, blurring the line between persuasion and manipulation. Finally, political data collection introduces privacy and governance risks, especially when behavioural data could be linked back to individuals or used to amplify polarising content because it “works” statistically.

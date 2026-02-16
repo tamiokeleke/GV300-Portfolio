@@ -1,0 +1,15 @@
+---
+title: "Tamilore Okeleke"
+description: | 
+image: "IMG_3757.jpeg"
+links:
+  - label: GitHub
+    url: "https://github.com/tamiokeleke"
+  - label: Email
+    url: "tammyokeleke@icloud.com"
+output:
+  postcards::trestles
+site: distill::distill_website
+---
+
+I am a final-year student of Politics and International Relations with a focus on applied quantitative methods. My work centres on using data to better understand political institutions, global governance, and patterns of political behaviour. I am particularly interested in how statistical analysis and clear data visualisation can turn complex political questions into evidence-based insights. This website is part of that process a space to showcase reproducible research, refine how I communicate technical work to broader audiences, and experiment with presenting political analysis in a public-facing format.

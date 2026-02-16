@@ -1,0 +1,14 @@
+name: "."
+title: "Tami"
+description: |
+  A website containing a quick description of me and a showcase of my R project
+output_dir: "docs"
+navbar:
+  right:
+    - text: "Home"
+      href: index.html
+    - text: "About"
+      href: about.Rmd
+    - text: "Blog"
+      href: blog.html
+output: distill::distill_article
