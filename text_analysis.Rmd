@@ -1,0 +1,45 @@
+---
+title: "Text Analysis"
+site: distill::distill_website
+output: distill::distill_article
+---
+```{r include=FALSE}
+load("run_unbanked.RData")
+library(ggplot2)
+library(dplyr)
+library(tidytext)
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
+```
+
+## Data Preparation
+```{r}
+
+text_data <- run_unbanked %>%
+  select(Q40_9_TEXT) %>%
+  na.omit()
+
+words <- text_data %>%
+  unnest_tokens(word, Q40_9_TEXT) %>%
+  count(word, sort = TRUE)
+
+head(words, 10)
+```
+
+## Top Word Frequencies
+```{r}
+words %>%
+  top_n(10, n) %>%
+  ggplot(aes(x = reorder(word, n), y = n)) +
+  geom_col(fill = "steelblue") +
+  coord_flip() +
+  labs(title = "Most common words", x = "Word", y = "Count") +
+  theme_minimal()
+```
+
+## Text Analysis Example
+
+I conducted a simple word frequency analysis on open-ended survey responses.
+
+The most common words were "time", "full", and "work", suggesting that respondents frequently mention time constraints and employment-related issues.
+
+This indicates that themes such as work, education, and caregiving responsibilities are central in the data.
